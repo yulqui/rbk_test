@@ -1,0 +1,699 @@
+<<<<<<< HEAD
+---
+title: "rbk_test"
+author: "YuliaM."
+date: "2026-06-16"
+output: html_document
+---
+
+Вам предстоит ответить на следующие вопросы:
+
+* Какое кол-во уникальных пользователей (по кукам) посетило проект pro.rbc.ru за исследуемую неделю? В какой день недели был пик по посещаемости?
+* Какое кол-во уникальных авторизованных пользователей (поле uuid заполнено) посетило проект pro.rbc.ru за исследуемую неделю? В какой день недели был пик по посещаемости этих пользователей?
+* Посчитайте какое кол-во браузеров используют авторизованные пользователи, сколько пользователей используют больше 10 браузеров? (Соотношение уникального кол-ва кук на авторизованного пользователя)
+* В какой час дня наблюдается пик посещаемости авторизованных пользователей? Есть ли различия в будни/выходные? (Визуализируйте динамику посещаемости по часам)
+
+# Constants
+
+```{r}
+# устанавливаем директорию в которой будем работать
+setwd(getwd())
+```
+
+## Adding libs
+
+```{r }
+#  подгружаем библиотеки
+gc()
+  library(data.table)
+  #library(infuser)
+  #library(readr)
+  library(dbplyr)
+  #library(googlesheets4)
+  library(plotly)
+  library(lubridate)
+  #library(clock)
+  #library(magrittr)
+  #library(timetk)
+   library(plotly)
+```
+
+## Upload data
+
+```{r }
+#d29 <- fread("logs_may22/2022-05-29.csv")
+
+```
+
+```{r}
+#rm(d29)
+
+# ищем все .csv файлы в папке logs_may22
+
+path_to_data <- "D:/R/rbk_test/logs_may22/"
+
+files <- list.files(
+  path = path_to_data,
+  pattern = "\\.csv$",
+  full.names = T
+)
+
+files
+
+```
+
+```{r}
+# for (file in files) {
+#   var_name <- paste0(
+#     "data_",
+#     gsub("-", "_", sub("\\.csv$", "", basename(file)))
+#   )
+# 
+#   assign(var_name, fread(file))
+# }
+
+```
+
+
+```{r}
+# По списку названий файлов подгружаем эти файлы в датафреймы и складываем датафреймы в список
+
+data_list <- setNames(
+  lapply(files, fread),
+  tools::file_path_sans_ext(basename(files))
+)
+```
+
+```{r}
+# data_list[[1]]
+```
+
+
+# Data wrangling
+
+
+
+```{r}
+# Добавляем колонку даты (согласно дате из названия файла) и объединяем (добавление таблиц друг к другу последовательно) в одну таблицу, колонке даты присваиваем тип "дата"
+dt_full <- dplyr::bind_rows(data_list, .id = "date")
+dt_full$date <- as.Date(dt_full$date)
+```
+
+```{r}
+# nrow(dt_full[is.na(splituid) | splituid == ''])
+```
+## 1
+
+Какое кол-во уникальных пользователей (по кукам) посетило проект pro.rbc.ru за исследуемую неделю? В какой день недели был пик по посещаемости?
+
+```{r}
+# считаем кол-во пользователей
+paste0('Количество уникальных пользователей по кукам за неделю 23-29.05.2022: ', uniqueN(dt_full[!is.na(splituid) | splituid != '']$splituid))
+```
+
+
+```{r}
+# таблица по частоте посещаемости по датам
+
+dt_full[, .(n_users = uniqueN(splituid)), by = date][order(date)]
+
+```
+
+```{r}
+# ответ
+paste0('Max number of unique users was on 2022-05-25')
+```
+
+```{r}
+# график по частоте посещаемости по датам
+
+temp_1 <- dt_full[, .(n_users = uniqueN(splituid)), by = date][order(date)]
+
+plot_ly(
+  temp_1,
+  x = ~date,
+  y = ~n_users,
+  type = "scatter",
+  mode = "lines+markers",
+  hovertemplate = paste(
+    "Date: %{x}<br>",
+    "Users: %{y}<extra></extra>"
+  )
+) %>%
+  layout(
+    title = "Daily Active Users (by cookies)",
+    xaxis = list(
+      title = "Date",
+      tickformat = "%d %b"
+    ),
+    yaxis = list(
+      title = "Unique Users",
+      separatethousands = TRUE,
+      rangemode = "tozero"
+    )
+  )
+```
+
+## 2
+Какое кол-во уникальных авторизованных пользователей (поле uuid заполнено) посетило проект pro.rbc.ru за исследуемую неделю? В какой день недели был пик по посещаемости этих пользователей?
+
+
+```{r}
+# nrow(dt_full[is.na(uuid) | uuid == ''])
+```
+
+```{r}
+# считаем кол-во пользователей
+
+paste0('Количество уникальных авторизированных пользователей за неделю 23-29.05.2022: ', uniqueN(dt_full[!is.na(uuid) & uuid != ""]$uuid))
+```
+
+
+```{r}
+
+# график по частоте посещаемости по датам
+
+temp_2 <- dt_full[!is.na(uuid) & uuid != "", .(n_authorised_users = uniqueN(uuid)), by = date][order(date)]
+
+plot_ly(
+  temp_2,
+  x = ~date,
+  y = ~n_authorised_users,
+  type = "scatter",
+  mode = "lines+markers",
+  hovertemplate = paste(
+    "Date: %{x}<br>",
+    "Auth.Users: %{y}<extra></extra>"
+  )
+) %>%
+  layout(
+    title = "Daily Active Authorised Users",
+    xaxis = list(
+      title = "Date",
+      tickformat = "%d %b"
+    ),
+    yaxis = list(
+      title = "Unique Auth. Users",
+      separatethousands = TRUE,
+      rangemode = "tozero"
+    )
+  )
+```
+
+```{r}
+
+# ответ
+
+paste0('Max number of unique authorised users was on 2022-05-25')
+```
+
+
+## 3
+Посчитайте какое кол-во браузеров используют авторизованные пользователи, сколько пользователей используют больше 10 браузеров? (Соотношение уникального кол-ва кук на авторизованного пользователя)
+
+
+
+```{r}
+# таблица соотношения uuid и кол-ва уникальных splituid у него
+
+browser_cnt <- dt_full[
+  !is.na(uuid) & uuid != "",
+  .(n_browsers = uniqueN(splituid)),
+  by = uuid
+]
+```
+
+
+```{r}
+# таблица кол-вом uuid, кол-ва uuid с больше чем 10 уникальных splituid у него, доля таких пользователей от всех uuid
+
+
+browser_cnt_fin <- browser_cnt[
+  ,
+  .(
+    users_total = .N,
+    users_gt10 = sum(n_browsers > 10),
+    share_gt10 = mean(n_browsers > 10)
+  )
+]
+
+browser_cnt_fin
+```
+
+```{r}
+# ответ
+
+paste0('all unique aithorized users: ', browser_cnt_fin$users_total, '/nall unique auth. users using over 10 browsers:', browser_cnt_fin$users_gt10, '/npercent of unique auth. users using over 10 browsers:', round(browser_cnt_fin$share_gt10, 4) * 100, ' %')
+```
+
+## 4 
+В какой час дня наблюдается пик посещаемости авторизованных пользователей? Есть ли различия в будни/выходные? (Визуализируйте динамику посещаемости по часам)
+
+```{r}
+# преобразование timestamp в Date-time формат
+dt_full[, ts := as.POSIXct(timestamp, format = "%d.%m.%Y %H:%M")]
+
+```
+
+```{r}
+# берем только авторизованных пользователей
+auth <- dt_full[!is.na(uuid) & uuid != ""]
+
+```
+
+
+```{r}
+# опрееляем час входа на сайт, определяем день недели (будний или выходной)
+
+auth[, hour := as.integer(format(ts, "%H"))]
+
+auth[, weekday := weekdays(as.Date(ts))]
+
+auth[, day_type := fifelse(
+  weekday %in% c("суббота", "воскресенье"),
+  "Weekend",
+  "Weekday"
+)]
+
+auth
+```
+
+
+```{r}
+# группируем по часу, дате и дню недели и смотрим уникальное кол-во пользователей
+hourly <- auth[, .(users = uniqueN(uuid)), by = .(date, day_type, hour)][order(day_type, hour)]
+hourly
+```
+
+
+```{r}
+# берем медиану и максимум пользователей по типу для часа и дня недели
+hourly <- hourly[, .(users_median = median(users),
+                   users_max = max(users)), by = .(day_type, hour)][order(day_type, hour)]
+hourly
+```
+
+
+```{r}
+# находим пиковый час для каждого типа дней недели (будни или выходные) и выводим таблицу
+hourly[, .SD[which.max(users_max)],by = day_type]
+
+```
+
+
+```{r}
+# преобразуем таблицу из широкого в длинный формат
+hourly_long <- melt(
+  hourly,
+  id.vars = c("day_type", "hour"),
+  measure.vars = c("users_median", "users_max"),
+  variable.name = "metric",
+  value.name = "users"
+)
+
+head(hourly_long)
+```
+
+
+
+```{r}
+
+# график по кол-ву уникальных пользователей (медиана и максимум уникальных пользователей)
+
+
+plot_ly(
+  hourly_long,
+  x = ~hour,
+  y = ~users,
+  color = ~day_type,
+  linetype = ~metric,
+  type = "scatter",
+  mode = "lines+markers"
+) %>%
+  layout(
+    title = "Hourly activity: median and max users",
+    xaxis = list(
+      title = "Hour of day",
+      tickmode = "linear",
+      dtick = 1
+    ),
+    yaxis = list(
+      title = "Unique authorised users",
+      rangemode = "tozero"
+    )
+  )
+
+```
+
+
+
+=======
+---
+title: "rbk_test"
+author: "YuliaM."
+date: "2026-06-16"
+output: html_document
+---
+
+Вам предстоит ответить на следующие вопросы:
+
+* Какое кол-во уникальных пользователей (по кукам) посетило проект pro.rbc.ru за исследуемую неделю? В какой день недели был пик по посещаемости?
+* Какое кол-во уникальных авторизованных пользователей (поле uuid заполнено) посетило проект pro.rbc.ru за исследуемую неделю? В какой день недели был пик по посещаемости этих пользователей?
+* Посчитайте какое кол-во браузеров используют авторизованные пользователи, сколько пользователей используют больше 10 браузеров? (Соотношение уникального кол-ва кук на авторизованного пользователя)
+* В какой час дня наблюдается пик посещаемости авторизованных пользователей? Есть ли различия в будни/выходные? (Визуализируйте динамику посещаемости по часам)
+
+# Constants
+
+```{r}
+# устанавливаем директорию в которой будем работать
+setwd(getwd())
+```
+
+## Adding libs
+
+```{r }
+#  подгружаем библиотеки
+gc()
+  library(data.table)
+  #library(infuser)
+  #library(readr)
+  library(dbplyr)
+  #library(googlesheets4)
+  library(plotly)
+  library(lubridate)
+  #library(clock)
+  #library(magrittr)
+  #library(timetk)
+   library(plotly)
+```
+
+## Upload data
+
+```{r }
+#d29 <- fread("logs_may22/2022-05-29.csv")
+
+```
+
+```{r}
+#rm(d29)
+
+# ищем все .csv файлы в папке logs_may22
+
+path_to_data <- "D:/R/rbk_test/logs_may22/"
+
+files <- list.files(
+  path = path_to_data,
+  pattern = "\\.csv$",
+  full.names = T
+)
+
+files
+
+```
+
+```{r}
+# for (file in files) {
+#   var_name <- paste0(
+#     "data_",
+#     gsub("-", "_", sub("\\.csv$", "", basename(file)))
+#   )
+# 
+#   assign(var_name, fread(file))
+# }
+
+```
+
+
+```{r}
+# По списку названий файлов подгружаем эти файлы в датафреймы и складываем датафреймы в список
+
+data_list <- setNames(
+  lapply(files, fread),
+  tools::file_path_sans_ext(basename(files))
+)
+```
+
+```{r}
+# data_list[[1]]
+```
+
+
+# Data wrangling
+
+
+
+```{r}
+# Добавляем колонку даты (согласно дате из названия файла) и объединяем (добавление таблиц друг к другу последовательно) в одну таблицу, колонке даты присваиваем тип "дата"
+dt_full <- dplyr::bind_rows(data_list, .id = "date")
+dt_full$date <- as.Date(dt_full$date)
+```
+
+```{r}
+# nrow(dt_full[is.na(splituid) | splituid == ''])
+```
+## 1
+
+Какое кол-во уникальных пользователей (по кукам) посетило проект pro.rbc.ru за исследуемую неделю? В какой день недели был пик по посещаемости?
+
+```{r}
+# считаем кол-во пользователей
+paste0('Количество уникальных пользователей по кукам за неделю 23-29.05.2022: ', uniqueN(dt_full[!is.na(splituid) | splituid != '']$splituid))
+```
+
+
+```{r}
+# таблица по частоте посещаемости по датам
+
+dt_full[, .(n_users = uniqueN(splituid)), by = date][order(date)]
+
+```
+
+```{r}
+# ответ
+paste0('Max number of unique users was on 2022-05-25')
+```
+
+```{r}
+# график по частоте посещаемости по датам
+
+temp_1 <- dt_full[, .(n_users = uniqueN(splituid)), by = date][order(date)]
+
+plot_ly(
+  temp_1,
+  x = ~date,
+  y = ~n_users,
+  type = "scatter",
+  mode = "lines+markers",
+  hovertemplate = paste(
+    "Date: %{x}<br>",
+    "Users: %{y}<extra></extra>"
+  )
+) %>%
+  layout(
+    title = "Daily Active Users (by cookies)",
+    xaxis = list(
+      title = "Date",
+      tickformat = "%d %b"
+    ),
+    yaxis = list(
+      title = "Unique Users",
+      separatethousands = TRUE,
+      rangemode = "tozero"
+    )
+  )
+```
+
+## 2
+Какое кол-во уникальных авторизованных пользователей (поле uuid заполнено) посетило проект pro.rbc.ru за исследуемую неделю? В какой день недели был пик по посещаемости этих пользователей?
+
+
+```{r}
+# nrow(dt_full[is.na(uuid) | uuid == ''])
+```
+
+```{r}
+# считаем кол-во пользователей
+
+paste0('Количество уникальных авторизированных пользователей за неделю 23-29.05.2022: ', uniqueN(dt_full[!is.na(uuid) & uuid != ""]$uuid))
+```
+
+
+```{r}
+
+# график по частоте посещаемости по датам
+
+temp_2 <- dt_full[!is.na(uuid) & uuid != "", .(n_authorised_users = uniqueN(uuid)), by = date][order(date)]
+
+plot_ly(
+  temp_2,
+  x = ~date,
+  y = ~n_authorised_users,
+  type = "scatter",
+  mode = "lines+markers",
+  hovertemplate = paste(
+    "Date: %{x}<br>",
+    "Auth.Users: %{y}<extra></extra>"
+  )
+) %>%
+  layout(
+    title = "Daily Active Authorised Users",
+    xaxis = list(
+      title = "Date",
+      tickformat = "%d %b"
+    ),
+    yaxis = list(
+      title = "Unique Auth. Users",
+      separatethousands = TRUE,
+      rangemode = "tozero"
+    )
+  )
+```
+
+```{r}
+
+# ответ
+
+paste0('Max number of unique authorised users was on 2022-05-25')
+```
+
+
+## 3
+Посчитайте какое кол-во браузеров используют авторизованные пользователи, сколько пользователей используют больше 10 браузеров? (Соотношение уникального кол-ва кук на авторизованного пользователя)
+
+
+
+```{r}
+# таблица соотношения uuid и кол-ва уникальных splituid у него
+
+browser_cnt <- dt_full[
+  !is.na(uuid) & uuid != "",
+  .(n_browsers = uniqueN(splituid)),
+  by = uuid
+]
+```
+
+
+```{r}
+# таблица кол-вом uuid, кол-ва uuid с больше чем 10 уникальных splituid у него, доля таких пользователей от всех uuid
+
+
+browser_cnt_fin <- browser_cnt[
+  ,
+  .(
+    users_total = .N,
+    users_gt10 = sum(n_browsers > 10),
+    share_gt10 = mean(n_browsers > 10)
+  )
+]
+
+browser_cnt_fin
+```
+
+```{r}
+# ответ
+
+paste0('all unique aithorized users: ', browser_cnt_fin$users_total, '/nall unique auth. users using over 10 browsers:', browser_cnt_fin$users_gt10, '/npercent of unique auth. users using over 10 browsers:', round(browser_cnt_fin$share_gt10, 4) * 100, ' %')
+```
+
+## 4 
+В какой час дня наблюдается пик посещаемости авторизованных пользователей? Есть ли различия в будни/выходные? (Визуализируйте динамику посещаемости по часам)
+
+```{r}
+# преобразование timestamp в Date-time формат
+dt_full[, ts := as.POSIXct(timestamp, format = "%d.%m.%Y %H:%M")]
+
+```
+
+```{r}
+# берем только авторизованных пользователей
+auth <- dt_full[!is.na(uuid) & uuid != ""]
+
+```
+
+
+```{r}
+# опрееляем час входа на сайт, определяем день недели (будний или выходной)
+
+auth[, hour := as.integer(format(ts, "%H"))]
+
+auth[, weekday := weekdays(as.Date(ts))]
+
+auth[, day_type := fifelse(
+  weekday %in% c("суббота", "воскресенье"),
+  "Weekend",
+  "Weekday"
+)]
+
+auth
+```
+
+
+```{r}
+# группируем по часу, дате и дню недели и смотрим уникальное кол-во пользователей
+hourly <- auth[, .(users = uniqueN(uuid)), by = .(date, day_type, hour)][order(day_type, hour)]
+hourly
+```
+
+
+```{r}
+# берем медиану и максимум пользователей по типу для часа и дня недели
+hourly <- hourly[, .(users_median = median(users),
+                   users_max = max(users)), by = .(day_type, hour)][order(day_type, hour)]
+hourly
+```
+
+
+```{r}
+# находим пиковый час для каждого типа дней недели (будни или выходные) и выводим таблицу
+hourly[, .SD[which.max(users_max)],by = day_type]
+
+```
+
+
+```{r}
+# преобразуем таблицу из широкого в длинный формат
+hourly_long <- melt(
+  hourly,
+  id.vars = c("day_type", "hour"),
+  measure.vars = c("users_median", "users_max"),
+  variable.name = "metric",
+  value.name = "users"
+)
+
+head(hourly_long)
+```
+
+
+
+```{r}
+
+# график по кол-ву уникальных пользователей (медиана и максимум уникальных пользователей)
+
+
+plot_ly(
+  hourly_long,
+  x = ~hour,
+  y = ~users,
+  color = ~day_type,
+  linetype = ~metric,
+  type = "scatter",
+  mode = "lines+markers"
+) %>%
+  layout(
+    title = "Hourly activity: median and max users",
+    xaxis = list(
+      title = "Hour of day",
+      tickmode = "linear",
+      dtick = 1
+    ),
+    yaxis = list(
+      title = "Unique authorised users",
+      rangemode = "tozero"
+    )
+  )
+
+```
+
+
+
+>>>>>>> 12b3c0a4089b713397c9d933a75166441cc0b9b3
